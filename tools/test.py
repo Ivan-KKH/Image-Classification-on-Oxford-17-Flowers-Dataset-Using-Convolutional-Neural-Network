@@ -25,9 +25,9 @@ except ImportError:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='mmcls test model')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument('--out', help='output result file')
+    parser.add_argument('--config', default='configs/resnet/resnet18_flowers_bs128.py', help='test config file path')
+    parser.add_argument('--checkpoint', default='output/resnet18_flowers_bs128/epoch_100.pth', help='checkpoint file')
+    parser.add_argument('--out', default='output/resnet18_flowers_bs128/test', help='output result file')
     parser.add_argument(
         '--metrics',
         type=str,
@@ -177,6 +177,8 @@ def main():
             for k, v in eval_results.items():
                 print(f'\n{k} : {v:.2f}')
         if args.out:
+#             import pdb
+#             pdb.set_trace()
             scores = np.vstack(outputs)
             pred_score = np.max(scores, axis=1)
             pred_label = np.argmax(scores, axis=1)

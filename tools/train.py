@@ -20,8 +20,8 @@ from mmcls.utils import collect_env, get_root_logger
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a model')
-    parser.add_argument('config', help='train config file path')
-    parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument('--config', default='configs/resnet/resnet18_flowers_bs128.py', help='train config file path, i.e. resnet18_flowers_bs128.py, resnet18_b16x8_cifar10.py')
+    parser.add_argument('--work-dir', default='output/resnet18_flowers_bs128', help='the dir to save logs and models')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(

@@ -6,9 +6,9 @@ from mmcls.apis import inference_model, init_model, show_result_pyplot
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('img', help='Image file')
-    parser.add_argument('config', help='Config file')
-    parser.add_argument('checkpoint', help='Checkpoint file')
+    parser.add_argument('--img', default='demo/image_0005.jpg', help='Image file')
+    parser.add_argument('--config', default='configs/resnet/resnet18_flowers_bs128.py',help='Config file')
+    parser.add_argument('--checkpoint', default='output/resnet18_flowers_bs128/epoch_100.pth')
     parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
     args = parser.parse_args()
