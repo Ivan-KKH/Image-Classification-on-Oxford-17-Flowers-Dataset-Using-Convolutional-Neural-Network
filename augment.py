@@ -6,7 +6,6 @@ import os, pdb
 import random
 from PIL import Image
 
-
 all_files = os.listdir("train/.")
 
 all_classes = [i for i in all_files if "class" in i]
