@@ -1,10 +1,24 @@
+from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import os, pdb
+import shutil
 
 
 all_images = os.listdir(".")
 all_images = [i for i in all_images if "jpg" in i]
 all_images = sorted(all_images)
+
+files = os.listdir('.')
+if 'train' in files:
+    shutil.rmtree('train')
+if 'val' in files:
+    shutil.rmtree('val')
+if 'test' in files:
+    shutil.rmtree('test')
+
+os.makedirs("train", exist_ok=True)
+os.makedirs("val", exist_ok=True)
+os.makedirs("test", exist_ok= True)
 # pdb.set_trace()
 
 # there are 1360 images totally with 17 classes, each class has 80 images
@@ -21,9 +35,7 @@ for i in range(17):
 #print(sorted(val_images[-1]))
 #print(sorted(test_images[-1]))
 
-os.makedirs("train", exist_ok=True)
-os.makedirs("val", exist_ok=True)
-os.makedirs("test", exist_ok= True)
+
 
 
 cnt = 0
