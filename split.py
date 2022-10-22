@@ -4,21 +4,21 @@ import os, pdb
 import shutil
 
 
-all_images = os.listdir(".")
+all_images = os.listdir("raw")
 all_images = [i for i in all_images if "jpg" in i]
 all_images = sorted(all_images)
 
 files = os.listdir('.')
 if 'train' in files:
-    shutil.rmtree('train')
+    shutil.rmtree('flower/train')
 if 'val' in files:
-    shutil.rmtree('val')
+    shutil.rmtree('flower/val')
 if 'test' in files:
-    shutil.rmtree('test')
+    shutil.rmtree('flower/test')
 
-os.makedirs("train", exist_ok=True)
-os.makedirs("val", exist_ok=True)
-os.makedirs("test", exist_ok= True)
+os.makedirs("flower/train", exist_ok=True)
+os.makedirs("flower/val", exist_ok=True)
+os.makedirs("flower/test", exist_ok= True)
 # pdb.set_trace()
 
 # there are 1360 images totally with 17 classes, each class has 80 images
@@ -42,8 +42,8 @@ cnt = 0
 for class_images in train_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
-        os.makedirs(f"train/{class_i}", exist_ok=True)
-        os.system(f"cp {img} train/{class_i}")
+        os.makedirs(f"flower/train/{class_i}", exist_ok=True)
+        os.system(f"cp raw/{img} flower/train/{class_i}")
     print("train", class_i)
     cnt += 1
     
@@ -51,8 +51,8 @@ cnt = 0
 for class_images in val_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
-        os.makedirs(f"val/{class_i}", exist_ok=True)
-        os.system(f"cp {img} val/{class_i}")
+        os.makedirs(f"flower/val/{class_i}", exist_ok=True)
+        os.system(f"cp raw/{img} flower/val/{class_i}")
     print("val", class_i)
     cnt += 1
 
@@ -61,7 +61,7 @@ cnt = 0
 for class_images in test_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
-        os.makedirs(f"test/{class_i}", exist_ok=True)
-        os.system(f"cp {img} test/{class_i}")
+        os.makedirs(f"flower/test/{class_i}", exist_ok=True)
+        os.system(f"cp raw/{img} flower/test/{class_i}")
     print("test", class_i)
     cnt += 1
