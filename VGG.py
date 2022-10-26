@@ -75,13 +75,7 @@ plt.ion()   # interactive mode
 #    and extract it to the current directory.
 # 
 # 
-'''
-transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-'''
+
 # %%
 # Data augmentation and normalization for training
 # Just normalization for validation
@@ -118,14 +112,13 @@ data_transforms = {
 data_dir = 'flower'
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
-                  for x in ['train', 'val', 'test']}
+                  for x in ['train', 'val','test']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
                                              shuffle=True, num_workers=4)
               for x in ['train', 'val', 'test']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
 class_names = image_datasets['train'].classes
-with open('flower/class_name.txt') as file:
-    class_names = [line.rstrip() for line in file]
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # %% [markdown]
@@ -172,7 +165,6 @@ imshow(out, title=[class_names[x] for x in classes])
 # 
 
 # %%
-
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
 
@@ -264,7 +256,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     
     ax0.legend()
     ax1.legend()
-    fig.savefig(os.path.join('./lossGraphs', f'train_ResNet.jpg'))
+    fig.savefig(os.path.join('./lossGraphs', f'train_VGG.jpg'))
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
@@ -313,11 +305,11 @@ def visualize_model(model, num_images=6):
 # 
 
 # %%
-model_ft = models.resnet18(pretrained=True)
-num_ftrs = model_ft.fc.in_features
+model_ft = models.vgg16(pretrained=True)
+num_ftrs = model_ft.classifier[6].in_features
 # Here the size of each output sample is set to 2.
 # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-model_ft.fc = nn.Linear(num_ftrs, len(class_names))
+model_ft.classifier[6] = nn.Linear(num_ftrs, len(class_names))
 
 model_ft = model_ft.to(device)
 
@@ -362,13 +354,13 @@ visualize_model(model_ft)
 # 
 
 # %%
-model_conv = torchvision.models.resnet18(pretrained=True)
+model_conv = torchvision.models.vgg16(pretrained=True)
 for param in model_conv.parameters():
     param.requires_grad = False
 
 # Parameters of newly constructed modules have requires_grad=True by default
-num_ftrs = model_conv.fc.in_features
-model_conv.fc = nn.Linear(num_ftrs, len(class_names))
+num_ftrs = model_conv.classifier[6].in_features
+model_conv.classifier[6] = nn.Linear(num_ftrs, len(class_names))
 
 model_conv = model_conv.to(device)
 
@@ -376,7 +368,7 @@ criterion = nn.CrossEntropyLoss()
 
 # Observe that only parameters of final layer are being optimized as
 # opposed to before.
-optimizer_conv = optim.SGD(model_conv.fc.parameters(), lr=0.001, momentum=0.9)
+optimizer_conv = optim.SGD(model_conv.classifier[6].parameters(), lr=0.001, momentum=0.9)
 
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
@@ -412,6 +404,3 @@ plt.show()
 # 
 
 
-
-# %%
-    
