@@ -311,8 +311,9 @@ def visualize_model(model, num_images=6):
 # 
 # 
 
+
 # %%
-model_ft = models.densenet121(pretrained=True)
+model_ft = models.densenet121(pretrained=False)
 num_ftrs = model_ft.classifier.in_features
 # Here the size of each output sample is set to 2.
 # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
@@ -344,6 +345,7 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=25)
 
+
 # %%
 visualize_model(model_ft)
 
@@ -359,58 +361,3 @@ visualize_model(model_ft)
 # 
 # 
 # 
-
-# %%
-model_conv = torchvision.models.densenet121(pretrained=True)
-for param in model_conv.parameters():
-    param.requires_grad = False
-
-# Parameters of newly constructed modules have requires_grad=True by default
-num_ftrs = model_conv.classifier.in_features
-model_conv.classifier = nn.Linear(num_ftrs, len(class_names))
-
-model_conv = model_conv.to(device)
-
-criterion = nn.CrossEntropyLoss()
-
-# Observe that only parameters of final layer are being optimized as
-# opposed to before.
-optimizer_conv = optim.SGD(model_conv.classifier.parameters(), lr=0.001, momentum=0.9)
-
-# Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
-
-# %% [markdown]
-# ### Train and evaluate
-# 
-# On CPU this will take about half the time compared to previous scenario.
-# This is expected as gradients don't need to be computed for most of the
-# network. However, forward does need to be computed.
-# 
-# 
-# 
-
-# %%
-model_conv = train_model(model_conv, criterion, optimizer_conv,
-                         exp_lr_scheduler, num_epochs=25)
-
-# %%
-visualize_model(model_conv)
-
-plt.ioff()
-plt.show()
-
-# %% [markdown]
-# ## Further Learning
-# 
-# If you would like to learn more about the applications of transfer learning,
-# checkout our [Quantized Transfer Learning for Computer Vision Tutorial](https://pytorch.org/tutorials/intermediate/quantized_transfer_learning_tutorial.html).
-# 
-# 
-# 
-# 
-
-
-
-# %%
-    

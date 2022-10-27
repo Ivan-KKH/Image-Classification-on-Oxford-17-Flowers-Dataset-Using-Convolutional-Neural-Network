@@ -3,6 +3,8 @@ import numpy as np
 import os, pdb
 import shutil
 
+with open('flower/class_name.txt') as file:
+    class_names = [line.rstrip() for line in file]
 
 all_images = os.listdir("raw")
 all_images = [i for i in all_images if "jpg" in i]
@@ -42,6 +44,7 @@ cnt = 0
 for class_images in train_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
+        class_i = class_names[cnt]
         os.makedirs(f"flower/train/{class_i}", exist_ok=True)
         os.system(f"cp raw/{img} flower/train/{class_i}")
     print("train", class_i)
@@ -51,6 +54,7 @@ cnt = 0
 for class_images in val_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
+        class_i = class_names[cnt]
         os.makedirs(f"flower/val/{class_i}", exist_ok=True)
         os.system(f"cp raw/{img} flower/val/{class_i}")
     print("val", class_i)
@@ -61,6 +65,7 @@ cnt = 0
 for class_images in test_images:
     for img in class_images:                                 
         class_i = "class_" + str(cnt)
+        class_i = class_names[cnt]
         os.makedirs(f"flower/test/{class_i}", exist_ok=True)
         os.system(f"cp raw/{img} flower/test/{class_i}")
     print("test", class_i)
