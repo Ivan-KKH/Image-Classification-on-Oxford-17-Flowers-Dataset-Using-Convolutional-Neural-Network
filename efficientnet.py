@@ -80,13 +80,6 @@ plt.ion()   # interactive mode
 # Data augmentation and normalization for training
 # Just normalization for validation
 data_transforms = {
-    'train': transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        
-    ]),
     
     'train': transforms.Compose([
         transforms.Resize(256),
@@ -182,7 +175,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         print('-' * 10)
 
         # Each epoch has a training and validation phase
-        for phase in ['train', 'val', 'test']:
+        for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:
@@ -226,9 +219,11 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             elif phase == 'val':
                 val_loss.append(epoch_loss)
                 val_acc.append(epoch_acc.cpu())
+            '''
             elif phase == 'test':
                 test_loss.append(epoch_loss)
                 test_acc.append(epoch_acc.cpu())
+            '''
             
             print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
@@ -247,12 +242,12 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     ax0 = fig.add_subplot(121, title="loss")
     ax1 = fig.add_subplot(122, title="top1acc")
 
-    ax0.plot(x_epoch, train_loss, 'bo-', label = 'train')
-    ax0.plot(x_epoch, val_loss, 'ro-', label = 'val')
-    ax0.plot(x_epoch, test_loss, 'go-', label = 'test')
-    ax1.plot(x_epoch, train_acc, 'bo-', label = 'train')
-    ax1.plot(x_epoch, val_acc, 'ro-', label = 'val')
-    ax1.plot(x_epoch, test_acc, 'go-', label = 'test')
+    ax0.plot(x_epoch, train_loss, 'b-', label = 'train')
+    ax0.plot(x_epoch, val_loss, 'r-', label = 'val')
+    #ax0.plot(x_epoch, test_loss, 'g-', label = 'test')
+    ax1.plot(x_epoch, train_acc, 'b-', label = 'train')
+    ax1.plot(x_epoch, val_acc, 'r-', label = 'val')
+    #ax1.plot(x_epoch, test_acc, 'g-', label = 'test')
     
     ax0.legend()
     ax1.legend()
