@@ -1,5 +1,6 @@
 # COMP3340_Project
 
 
-1. python split.py
-2. Run the 4 model ipynb
+1. Run python split_aug.py
+2. This will generate 64 original images and 64 augmented images to flower/train, and 8 images to flower/val and flower/test
+3. Run the 4 model ipynb

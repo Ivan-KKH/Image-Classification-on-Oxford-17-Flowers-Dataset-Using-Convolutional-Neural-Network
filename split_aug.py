@@ -40,7 +40,6 @@ for i in range(17):
 #print(sorted(val_images[-1]))
 #print(sorted(test_images[-1]))
 
-
 transform1 = T.RandomRotation((-45, 45))
 transform2_1 = T.RandomVerticalFlip(1)
 transform2_2 = T.RandomHorizontalFlip(1)
