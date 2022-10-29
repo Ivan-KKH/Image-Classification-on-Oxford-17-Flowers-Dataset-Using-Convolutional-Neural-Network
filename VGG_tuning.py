@@ -1,40 +1,5 @@
 
-
-# %% [markdown]
-# 
-# # Transfer Learning for Computer Vision Tutorial
-# **Author**: [Sasank Chilamkurthy](https://chsasank.github.io)
-# 
-# In this tutorial, you will learn how to train a convolutional neural network for
-# image classification using transfer learning. You can read more about the transfer
-# learning at [cs231n notes](https://cs231n.github.io/transfer-learning/)_
-# 
-# Quoting these notes,
-# 
-#     In practice, very few people train an entire Convolutional Network
-#     from scratch (with random initialization), because it is relatively
-#     rare to have a dataset of sufficient size. Instead, it is common to
-#     pretrain a ConvNet on a very large dataset (e.g. ImageNet, which
-#     contains 1.2 million images with 1000 categories), and then use the
-#     ConvNet either as an initialization or a fixed feature extractor for
-#     the task of interest.
-# 
-# These two major transfer learning scenarios look as follows:
-# 
-# -  **Finetuning the convnet**: Instead of random initialization, we
-#    initialize the network with a pretrained network, like the one that is
-#    trained on imagenet 1000 dataset. Rest of the training looks as
-#    usual.
-# -  **ConvNet as fixed feature extractor**: Here, we will freeze the weights
-#    for all of the network except that of the final fully connected
-#    layer. This last fully connected layer is replaced with a new one
-#    with random weights and only this layer is trained.
-# 
-
 # %%
-# License: BSD
-# Author: Sasank Chilamkurthy
-
 from __future__ import print_function, division
 
 import torch
@@ -49,41 +14,20 @@ import matplotlib.pyplot as plt
 import time
 import os
 import copy
+import optuna
+from optuna.trial import TrialState
 
 cudnn.benchmark = True
 plt.ion()   # interactive mode
 
-# %% [markdown]
-# ## Load Data
-# 
-# We will use torchvision and torch.utils.data packages for loading the
-# data.
-# 
-# The problem we're going to solve today is to train a model to classify
-# **ants** and **bees**. We have about 120 training images each for ants and bees.
-# There are 75 validation images for each class. Usually, this is a very
-# small dataset to generalize upon, if trained from scratch. Since we
-# are using transfer learning, we should be able to generalize reasonably
-# well.
-# 
-# This dataset is a very small subset of imagenet.
-# 
-# .. Note ::
-#    Download the data from
-#    [here](https://download.pytorch.org/tutorial/hymenoptera_data.zip)
-#    and extract it to the current directory.
-# 
-# 
-
 # %%
 # Data augmentation and normalization for training
-# Just normalization for validation
 data_transforms = {
-    
+        
     'train': transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]),    
+    ]),
     'val': transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -94,11 +38,12 @@ data_transforms = {
     ])
 }
 
+# Data loading
 data_dir = 'flower'
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
-                  for x in ['train', 'val', 'test']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
+                  for x in ['train', 'val','test']}
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=32,
                                              shuffle=True, num_workers=4)
               for x in ['train', 'val', 'test']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
@@ -106,13 +51,10 @@ class_names = image_datasets['train'].classes
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# %% [markdown]
+
 # ### Visualize a few images
 # Let's visualize a few training images so as to understand the data
-# augmentations.
-# 
-# 
-
+# augmentations. 
 # %%
 def imshow(inp, title=None):
     """Imshow for Tensor."""
@@ -135,31 +77,10 @@ out = torchvision.utils.make_grid(inputs)
 
 imshow(out, title=[class_names[x] for x in classes])
 
-inputs, classes = next(iter(dataloaders['train']))
-
-# Make a grid from batch
-out = torchvision.utils.make_grid(inputs)
-
-imshow(out, title=[class_names[x] for x in classes])
-
 # %% [markdown]
 # ## Training the model
-# 
-# Now, let's write a general function to train a model. Here, we will
-# illustrate:
-# 
-# -  Scheduling the learning rate
-# -  Saving the best model
-# 
-# In the following, parameter ``scheduler`` is an LR scheduler object from
-# ``torch.optim.lr_scheduler``.
-# 
-# 
-
-
 # %%
-
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(trial, model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -220,19 +141,21 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             elif phase == 'val':
                 val_loss.append(epoch_loss)
                 val_acc.append(epoch_acc.cpu())
+                study_acc = epoch_acc
             '''
             elif phase == 'test':
                 test_loss.append(epoch_loss)
                 test_acc.append(epoch_acc.cpu())
             '''
-            
             print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-
+        trial.report(study_acc, epoch)   
+        if trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
         print()
 
     time_elapsed = time.time() - since
@@ -252,16 +175,14 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     
     ax0.legend()
     ax1.legend()
-    fig.savefig(os.path.join('./lossGraphs', f'train_ResNet.jpg'))
+    fig.savefig(os.path.join('./lossGraphs', f'train_VGG.jpg'))
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model
+    return model, study_acc
 
-
+# %% [markdown]
 # ### Visualizing the model predictions
-# 
-# Generic function to display predictions for a few images 
-
+# Generic function to display predictions for a few images
 # %%
 def visualize_model(model, num_images=6):
     was_training = model.training
@@ -289,34 +210,67 @@ def visualize_model(model, num_images=6):
                     return
         model.train(mode=was_training)
 
-# ## Finetuning the convnet
+# %% [markdown]
+# Load a pretrained model and reset final fully connected layer.
 # %%
 
-model_ft = models.resnet18(pretrained=False)
-num_ftrs = model_ft.fc.in_features
-# Here the size of each output sample is set to 2.
-# Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-model_ft.fc = nn.Linear(num_ftrs, len(class_names))
-
-model_ft = model_ft.to(device)
-
-criterion = nn.CrossEntropyLoss()
 
 # Observe that all parameters are being optimized
-optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+#optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.005, momentum=0.9)
 
-# Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
+def objective(trial):
+    model = models.vgg16(pretrained=False)
+    num_ftrs = model.classifier[6].in_features
+    model.classifier[6] = nn.Linear(num_ftrs, len(class_names))
+
+    model = model.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log= True)
+    gamma = trial.suggest_float("gamma", 0, 1)
+    optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)
+
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=gamma)
+
+    # %%
+
+
+    # %% [markdown]
+    # ### Train and evaluate
+    # 
+    # It should take around 15-25 min on CPU. On GPU though, it takes less than a
+    # minute.
+    # 
+    # 
+    # 
+
+    # %%
+    model, study_acc = train_model(trial, model, criterion, optimizer, exp_lr_scheduler,
+                        num_epochs=50)
+
+    return study_acc
+
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=100)
+
+pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+print("Study statistics: ")
+print("  Number of finished trials: ", len(study.trials))
+print("  Number of pruned trials: ", len(pruned_trials))
+print("  Number of complete trials: ", len(complete_trials))
+
+print("Best trial:")
+trial = study.best_trial
+
+print("  Value: ", trial.value)
+
+print("  Params: ")
+for key, value in trial.params.items():
+    print("    {}: {}".format(key, value))
 # %%
-
-
-# %% [markdown]
-# ### Train and evaluate
-# %%
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=50)
-
-# %%
-visualize_model(model_ft)
-
+#visualize_model(model)
