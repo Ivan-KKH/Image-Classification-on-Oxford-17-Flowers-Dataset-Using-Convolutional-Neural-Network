@@ -41,7 +41,7 @@ data_dir = 'flower'
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
                   for x in ['train', 'val','test']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=16,
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
                                              shuffle=True, num_workers=4)
               for x in ['train', 'val', 'test']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
@@ -150,27 +150,27 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
+        fig = plt.figure()
+        ax0 = fig.add_subplot(121, title="loss")
+        ax1 = fig.add_subplot(122, title="top1acc")
 
+        ax0.plot(x_epoch[:epoch + 1], train_loss, 'b-', label = 'train')
+        ax0.plot(x_epoch[:epoch + 1], val_loss, 'r-', label = 'val')
+        #ax0.plot(x_epoch, test_loss, 'g-', label = 'test')
+        ax1.plot(x_epoch[:epoch + 1], train_acc, 'b-', label = 'train')
+        ax1.plot(x_epoch[:epoch + 1], val_acc, 'r-', label = 'val')
+        #ax1.plot(x_epoch, test_acc, 'g-', label = 'test')
+        
+        ax0.legend()
+        ax1.legend()
+        fig.savefig(os.path.join('./lossGraphs', f'train_VGG.jpg'))
         print()
 
     time_elapsed = time.time() - since
     print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
     print(f'Best val Acc: {best_acc:4f}')
 
-    fig = plt.figure()
-    ax0 = fig.add_subplot(121, title="loss")
-    ax1 = fig.add_subplot(122, title="top1acc")
 
-    ax0.plot(x_epoch, train_loss, 'b-', label = 'train')
-    ax0.plot(x_epoch, val_loss, 'r-', label = 'val')
-    #ax0.plot(x_epoch, test_loss, 'g-', label = 'test')
-    ax1.plot(x_epoch, train_acc, 'b-', label = 'train')
-    ax1.plot(x_epoch, val_acc, 'r-', label = 'val')
-    #ax1.plot(x_epoch, test_acc, 'g-', label = 'test')
-    
-    ax0.legend()
-    ax1.legend()
-    fig.savefig(os.path.join('./lossGraphs', f'train_VGG.jpg'))
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
@@ -221,10 +221,11 @@ criterion = nn.CrossEntropyLoss()
 
 
 
-optimizer_ft = torch.optim.SGD(model.parameters(), lr=0.005, weight_decay = 0.005, momentum = 0.9)
+#optimizer_ft = torch.optim.SGD(model.parameters(), lr=0.005, weight_decay = 0.005, momentum = 0.9)
+optimizer_ft = torch.optim.Adam(model.parameters(), lr= 5e-06)
 
 # Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.5)
 
 # %%
 
