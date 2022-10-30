@@ -294,7 +294,7 @@ model = getattr(densenet, model_name)()
 # Data loading
 data_dir = 'flower'
 
-batch_size = 4
+batch_size = 64
 
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
