@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import time
 import os
 import copy
-from model import densenet
+from model import vgg
 from torch.utils.tensorboard import SummaryWriter
 # %%
 cudnn.benchmark = True
@@ -285,10 +285,10 @@ def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
 # %% [markdown]
 # Load a pretrained model and reset final fully connected layer.
 # %%
-model_name = 'densenet121'
-optimizer_name = 'SGD'
+model_name = 'vgg16_bn'
+optimizer_name = 'adam'
 number_of_epoch = 50 
-model = getattr(densenet, model_name)()
+model = getattr(vgg, model_name)(pretrained=False)
 #model = vgg.vgg16(pretrained=False)
 
 # Data loading
@@ -318,19 +318,27 @@ model_ft = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
-lr = 0.001
+lr = 1e-04
 gamma = 0.1
-#momentum = 0.9
-
 # Observe that all parameters are being optimized
+#optimizer_ft = torch.optim.SGD(model.parameters(), lr=0.005, weight_decay = 0.005, momentum = 0.9)
 optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
-#optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
 
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
 
+# %%
 
+
+# %% [markdown]
 # ### Train and evaluate
+# 
+# It should take around 15-25 min on CPU. On GPU though, it takes less than a
+# minute.
+# 
+# 
+# 
+
 # %%
 writer_name = f"{model_name}_{optimizer_name}_lr_{lr}_gamma_{gamma}_batch_size_{batch_size}"
 

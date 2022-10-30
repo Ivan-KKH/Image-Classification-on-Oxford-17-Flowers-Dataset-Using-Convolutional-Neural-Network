@@ -152,11 +152,11 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
         
         ax0.legend()
         ax1.legend()
-        writer.add_figure(tag = 'Graphs', figure= fig)
-        writer.flush()
+        
         fig.savefig(os.path.join('./lossGraphs', f'{writer_name}.jpg'))
         print()
-
+    writer.add_figure(tag = 'Graphs', figure= fig)
+    writer.flush()
     time_elapsed = time.time() - since
     print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
     print(f'Best val Acc: {best_acc:4f}')
