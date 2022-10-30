@@ -285,7 +285,7 @@ def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
 # %% [markdown]
 # Load a pretrained model and reset final fully connected layer.
 # %%
-model_name = 'ResNet18'
+model_name = 'ResNet34'
 optimizer_name = 'SGD'
 number_of_epoch = 50 
 model = getattr(resnet, model_name)()
@@ -318,13 +318,12 @@ model_ft = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
-lr = 0.001
+lr = 1e-4
 gamma = 0.1
 momentum = 0.9
 # Observe that all parameters are being optimized
-#optimizer_ft = torch.optim.SGD(model.parameters(), lr=0.005, weight_decay = 0.005, momentum = 0.9)
-#optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
-optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
+optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
+#optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
 
 # Decay LR by a factor of 0.1 every 7 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)

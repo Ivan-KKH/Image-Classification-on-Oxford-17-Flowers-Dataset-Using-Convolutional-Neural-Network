@@ -286,7 +286,7 @@ def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
 # Load a pretrained model and reset final fully connected layer.
 # %%
 model_name = 'EfficientNet'
-version = 'b2'
+version = 'b0'
 optimizer_name = 'SGD'
 number_of_epoch = 50 
 model = getattr(efficientnet, model_name)(version)

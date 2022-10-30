@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import time
 import os
 import copy
-from model import densenet
+from model import resnet
 from torch.utils.tensorboard import SummaryWriter
 # %%
 cudnn.benchmark = True
@@ -61,7 +61,7 @@ def imshow(inp, title=None):
 
 # ## Training the model
 # %%
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_name = ''):
+def train_model(model, dataloaders, writer, criterion, optimizer, scheduler, num_epochs=25, writer_name = ''):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -170,7 +170,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
 # ### Visualizing the model predictions
 # Generic function to display predictions for a few images
 # %%
-def visualize_model(model, num_images=6):
+def visualize_model(model, dataloaders, num_images=6):
     was_training = model.training
     model.eval()
     images_so_far = 0
@@ -196,7 +196,7 @@ def visualize_model(model, num_images=6):
                     return
         model.train(mode=was_training)
 
-def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
+def eval_model(model, dataloaders, criterion, optimizer, scheduler, num_epochs=1):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -285,76 +285,81 @@ def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
 # %% [markdown]
 # Load a pretrained model and reset final fully connected layer.
 # %%
-model_name = 'densenet121'
-optimizer_name = 'adam'
-number_of_epoch = 50 
-model = getattr(densenet, model_name)()
-#model = vgg.vgg16(pretrained=False)
-
-# Data loading
 data_dir = 'flower'
-
-batch_size = 4
-
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
-                                          data_transforms[x])
-                  for x in ['train', 'val','test']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
-                                             shuffle=True, num_workers=4)
-              for x in ['train', 'val', 'test']}
+                                        data_transforms[x])
+                for x in ['train', 'val','test']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
-class_names = image_datasets['train'].classes
+
+def build_model(model_name = 'ResNet18', batch_size = 4, lr =0.01):
+    #model_name = 'ResNet18'
+    optimizer_name = 'SGD'
+    number_of_epoch = 50 
+    model = getattr(resnet, model_name)()
+    #model = vgg.vgg16(pretrained=False)
+
+    # Data loading
+    
+
+    #batch_size = 4
 
 
-# Get a batch of training data
-inputs, classes = next(iter(dataloaders['train']))
-
-# Make a grid from batch
-out = torchvision.utils.make_grid(inputs)
-
-imshow(out, title=[class_names[x] for x in classes])
-
-model_ft = model.to(device)
-
-criterion = nn.CrossEntropyLoss()
-
-lr = 1e-4
-gamma = 0.1
-#momentum = 0.9
-
-# Observe that all parameters are being optimized
-optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
-#optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
-
-# Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
+    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                                shuffle=True, num_workers=4)
+                for x in ['train', 'val', 'test']}
+    
+    class_names = image_datasets['train'].classes
 
 
-# ### Train and evaluate
-# %%
-writer_name = f"{model_name}_{optimizer_name}_lr_{lr}_gamma_{gamma}_batch_size_{batch_size}"
+    # Get a batch of training data
+    inputs, classes = next(iter(dataloaders['train']))
 
-writer = SummaryWriter(comment = writer_name)
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                    num_epochs=number_of_epoch, writer_name = writer_name)
+    # Make a grid from batch
+    out = torchvision.utils.make_grid(inputs)
 
-# %%
-test_loss, test_acc = eval_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler)
+    imshow(out, title=[class_names[x] for x in classes])
 
-writer.add_hparams({
-        "batch_size": batch_size,
-        "learning_rate": lr,
-        "model_name": model_name,
-        "optimizer": optimizer_name,
-        "num_of_epoch": number_of_epoch
-        },
-        {
-        "test_acc": test_acc,
-        "test_loss" : test_loss}
-        )
-writer.flush()
-writer.close()
-# %%
-visualize_model(model_ft)
+    model_ft = model.to(device)
 
-# %%
+    criterion = nn.CrossEntropyLoss()
+
+    #lr = 0.001
+    gamma = 0.1
+    momentum = 0.9
+    # Observe that all parameters are being optimized
+    #optimizer_ft = torch.optim.SGD(model.parameters(), lr=0.005, weight_decay = 0.005, momentum = 0.9)
+    #optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
+    optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
+
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
+
+
+    # ### Train and evaluate
+    # %%
+    writer_name = f"{model_name}_{optimizer_name}_lr_{lr}_gamma_{gamma}_batch_size_{batch_size}"
+
+    writer = SummaryWriter(comment = writer_name)
+    model_ft = train_model(model_ft, dataloaders, writer, criterion, optimizer_ft, exp_lr_scheduler,
+                        num_epochs=number_of_epoch, writer_name = writer_name)
+
+    # %%
+    test_loss, test_acc = eval_model(model_ft, dataloaders, criterion, optimizer_ft, exp_lr_scheduler)
+
+    writer.add_hparams({
+            "batch_size": batch_size,
+            "learning_rate": lr,
+            "model_name": model_name,
+            "optimizer": optimizer_name,
+            "num_of_epoch": number_of_epoch
+            },
+            {
+            "test_acc": test_acc,
+            "test_loss" : test_loss}
+            )
+    writer.flush()
+    writer.close()
+    # %%
+    #visualize_model(model_ft)
+
+    # %%
