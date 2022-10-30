@@ -1,41 +1,5 @@
-# %%
-%matplotlib inline
-
-# %% [markdown]
-# 
-# # Transfer Learning for Computer Vision Tutorial
-# **Author**: [Sasank Chilamkurthy](https://chsasank.github.io)
-# 
-# In this tutorial, you will learn how to train a convolutional neural network for
-# image classification using transfer learning. You can read more about the transfer
-# learning at [cs231n notes](https://cs231n.github.io/transfer-learning/)_
-# 
-# Quoting these notes,
-# 
-#     In practice, very few people train an entire Convolutional Network
-#     from scratch (with random initialization), because it is relatively
-#     rare to have a dataset of sufficient size. Instead, it is common to
-#     pretrain a ConvNet on a very large dataset (e.g. ImageNet, which
-#     contains 1.2 million images with 1000 categories), and then use the
-#     ConvNet either as an initialization or a fixed feature extractor for
-#     the task of interest.
-# 
-# These two major transfer learning scenarios look as follows:
-# 
-# -  **Finetuning the convnet**: Instead of random initialization, we
-#    initialize the network with a pretrained network, like the one that is
-#    trained on imagenet 1000 dataset. Rest of the training looks as
-#    usual.
-# -  **ConvNet as fixed feature extractor**: Here, we will freeze the weights
-#    for all of the network except that of the final fully connected
-#    layer. This last fully connected layer is replaced with a new one
-#    with random weights and only this layer is trained.
-# 
 
 # %%
-# License: BSD
-# Author: Sasank Chilamkurthy
-
 from __future__ import print_function, division
 
 import torch
@@ -50,43 +14,17 @@ import matplotlib.pyplot as plt
 import time
 import os
 import copy
-
+from model import densenet
+from torch.utils.tensorboard import SummaryWriter
+# %%
 cudnn.benchmark = True
 plt.ion()   # interactive mode
 
-# %% [markdown]
-# ## Load Data
-# 
-# We will use torchvision and torch.utils.data packages for loading the
-# data.
-# 
-# The problem we're going to solve today is to train a model to classify
-# **ants** and **bees**. We have about 120 training images each for ants and bees.
-# There are 75 validation images for each class. Usually, this is a very
-# small dataset to generalize upon, if trained from scratch. Since we
-# are using transfer learning, we should be able to generalize reasonably
-# well.
-# 
-# This dataset is a very small subset of imagenet.
-# 
-# .. Note ::
-#    Download the data from
-#    [here](https://download.pytorch.org/tutorial/hymenoptera_data.zip)
-#    and extract it to the current directory.
-# 
-# 
-'''
-transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-'''
+
 # %%
 # Data augmentation and normalization for training
-# Just normalization for validation
 data_transforms = {
-    
+        
     'train': transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -101,25 +39,13 @@ data_transforms = {
     ])
 }
 
-data_dir = 'flower'
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
-                                          data_transforms[x])
-                  for x in ['train', 'val', 'test']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4,
-                                             shuffle=True, num_workers=4)
-              for x in ['train', 'val', 'test']}
-dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
-class_names = image_datasets['train'].classes
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# %% [markdown]
+
 # ### Visualize a few images
 # Let's visualize a few training images so as to understand the data
-# augmentations.
-# 
-# 
-
+# augmentations. 
 # %%
 def imshow(inp, title=None):
     """Imshow for Tensor."""
@@ -133,32 +59,9 @@ def imshow(inp, title=None):
         plt.title(title)
     plt.pause(0.001)  # pause a bit so that plots are updated
 
-
-# Get a batch of training data
-inputs, classes = next(iter(dataloaders['train']))
-
-# Make a grid from batch
-out = torchvision.utils.make_grid(inputs)
-
-imshow(out, title=[class_names[x] for x in classes])
-
-# %% [markdown]
 # ## Training the model
-# 
-# Now, let's write a general function to train a model. Here, we will
-# illustrate:
-# 
-# -  Scheduling the learning rate
-# -  Saving the best model
-# 
-# In the following, parameter ``scheduler`` is an LR scheduler object from
-# ``torch.optim.lr_scheduler``.
-# 
-# 
-
 # %%
-
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_name = ''):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -216,9 +119,15 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             if phase == 'train':
                 train_loss.append(epoch_loss)
                 train_acc.append(epoch_acc.cpu())
+                writer.add_scalar("Loss/train", epoch_loss, epoch)
+                writer.add_scalar("acc/train", epoch_acc, epoch)
+                writer.flush()
             elif phase == 'val':
                 val_loss.append(epoch_loss)
                 val_acc.append(epoch_acc.cpu())
+                writer.add_scalar("Loss/val", epoch_loss, epoch)
+                writer.add_scalar("acc/val", epoch_acc, epoch)
+                writer.flush()
             '''
             elif phase == 'test':
                 test_loss.append(epoch_loss)
@@ -230,39 +139,36 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
+        fig = plt.figure()
+        ax0 = fig.add_subplot(121, title="loss")
+        ax1 = fig.add_subplot(122, title="top1acc")
 
+        ax0.plot(x_epoch[:epoch + 1], train_loss, 'b-', label = 'train')
+        ax0.plot(x_epoch[:epoch + 1], val_loss, 'r-', label = 'val')
+        #ax0.plot(x_epoch, test_loss, 'g-', label = 'test')
+        ax1.plot(x_epoch[:epoch + 1], train_acc, 'b-', label = 'train')
+        ax1.plot(x_epoch[:epoch + 1], val_acc, 'r-', label = 'val')
+        #ax1.plot(x_epoch, test_acc, 'g-', label = 'test')
+        
+        ax0.legend()
+        ax1.legend()
+        writer.add_figure(tag = 'Graphs', figure= fig)
+        writer.flush()
+        fig.savefig(os.path.join('./lossGraphs', f'{writer_name}.jpg'))
         print()
 
     time_elapsed = time.time() - since
     print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
     print(f'Best val Acc: {best_acc:4f}')
 
-    fig = plt.figure()
-    ax0 = fig.add_subplot(121, title="loss")
-    ax1 = fig.add_subplot(122, title="top1acc")
 
-    ax0.plot(x_epoch, train_loss, 'b-', label = 'train')
-    ax0.plot(x_epoch, val_loss, 'r-', label = 'val')
-    #ax0.plot(x_epoch, test_loss, 'g-', label = 'test')
-    ax1.plot(x_epoch, train_acc, 'b-', label = 'train')
-    ax1.plot(x_epoch, val_acc, 'r-', label = 'val')
-    #ax1.plot(x_epoch, test_acc, 'g-', label = 'test')
-    
-    ax0.legend()
-    ax1.legend()
-    fig.savefig(os.path.join('./lossGraphs', f'train_DenseNet.jpg'))
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
 
-# %% [markdown]
-# ### Visualizing the model predictions
-# 
-# Generic function to display predictions for a few images
-# 
-# 
-# 
 
+# ### Visualizing the model predictions
+# Generic function to display predictions for a few images
 # %%
 def visualize_model(model, num_images=6):
     was_training = model.training
@@ -290,61 +196,165 @@ def visualize_model(model, num_images=6):
                     return
         model.train(mode=was_training)
 
+def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
+    since = time.time()
+
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_acc = 0.0
+    train_loss = []
+    val_loss = []
+    test_loss = []
+    train_acc = []
+    val_acc = []
+    test_acc = []
+    x_epoch = np.arange(num_epochs)
+    for epoch in range(num_epochs):
+        print(f'Epoch {epoch}/{num_epochs - 1}')
+        print('-' * 10)
+
+        # Each epoch has a training and validation phase
+        for phase in ['test']:
+            if phase == 'train':
+                model.train()  # Set model to training mode
+            else:
+                model.eval()   # Set model to evaluate mode
+
+            running_loss = 0.0
+            running_corrects = 0
+
+            # Iterate over data.
+            for inputs, labels in dataloaders[phase]:
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward
+                # track history if only in train
+                with torch.set_grad_enabled(phase == 'train'):
+                    outputs = model(inputs)
+                    _, preds = torch.max(outputs, 1)
+                    loss = criterion(outputs, labels)
+
+                    # backward + optimize only if in training phase
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+
+                # statistics
+                running_loss += loss.item() * inputs.size(0)
+                running_corrects += torch.sum(preds == labels.data)
+
+            if phase == 'train':
+                scheduler.step()
+
+            epoch_loss = running_loss / dataset_sizes[phase]
+            epoch_acc = running_corrects.double() / dataset_sizes[phase]
+            if phase == 'train':
+                train_loss.append(epoch_loss)
+                train_acc.append(epoch_acc.cpu())
+                writer.add_scalar("Loss/train", epoch_loss, epoch)
+                writer.add_scalar("acc/train", epoch_acc, epoch)
+                writer.flush()
+                
+            elif phase == 'val':
+                val_loss.append(epoch_loss)
+                val_acc.append(epoch_acc.cpu())
+                writer.add_scalar("Loss/val", epoch_loss, epoch)
+                writer.add_scalar("acc/val", epoch_acc, epoch)
+                writer.flush()
+            
+            elif phase == 'test':
+                test_loss.append(epoch_loss)
+                test_acc.append(epoch_acc.cpu())
+            
+            print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+
+            # deep copy the model
+            if phase == 'val' and epoch_acc > best_acc:
+                best_acc = epoch_acc
+                best_model_wts = copy.deepcopy(model.state_dict())
+
+    time_elapsed = time.time() - since
+
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+    return test_loss[0], test_acc[0]
 # %% [markdown]
-# ## Finetuning the convnet
-# 
 # Load a pretrained model and reset final fully connected layer.
-# 
-# 
-# 
-
-
 # %%
-model_ft = models.densenet121(pretrained=False)
-num_ftrs = model_ft.classifier.in_features
-# Here the size of each output sample is set to 2.
-# Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-model_ft.classifier = nn.Linear(num_ftrs, len(class_names))
+model_name = 'densenet121'
+optimizer_name = 'SGD'
+number_of_epoch = 50 
+model = getattr(densenet, model_name)()
+#model = vgg.vgg16(pretrained=False)
 
-model_ft = model_ft.to(device)
+# Data loading
+data_dir = 'flower'
+
+batch_size = 4
+
+image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
+                                          data_transforms[x])
+                  for x in ['train', 'val','test']}
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                             shuffle=True, num_workers=4)
+              for x in ['train', 'val', 'test']}
+dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
+class_names = image_datasets['train'].classes
+
+
+# Get a batch of training data
+inputs, classes = next(iter(dataloaders['train']))
+
+# Make a grid from batch
+out = torchvision.utils.make_grid(inputs)
+
+imshow(out, title=[class_names[x] for x in classes])
+
+model_ft = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
+lr = 0.001
+gamma = 0.1
+#momentum = 0.9
+
 # Observe that all parameters are being optimized
-optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
+#optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
 
 # Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-
-# %%
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
 
 
-# %% [markdown]
 # ### Train and evaluate
-# 
-# It should take around 15-25 min on CPU. On GPU though, it takes less than a
-# minute.
-# 
-# 
-# 
+# %%
+writer_name = f"{model_name}_{optimizer_name}_lr_{lr}_gamma_{gamma}_batch_size_{batch_size}"
+
+writer = SummaryWriter(comment = writer_name)
+model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+                    num_epochs=number_of_epoch, writer_name = writer_name)
 
 # %%
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=25)
+test_loss, test_acc = eval_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler)
 
-
+writer.add_hparams({
+        "batch_size": batch_size,
+        "learning_rate": lr,
+        "model_name": model_name,
+        "optimizer": optimizer_name,
+        "num_of_epoch": number_of_epoch
+        },
+        {
+        "test_acc": test_acc,
+        "test_loss" : test_loss}
+        )
+writer.flush()
+writer.close()
 # %%
 visualize_model(model_ft)
 
-# %% [markdown]
-# ## ConvNet as fixed feature extractor
-# 
-# Here, we need to freeze all the network except the final layer. We need
-# to set ``requires_grad = False`` to freeze the parameters so that the
-# gradients are not computed in ``backward()``.
-# 
-# You can read more about this in the documentation
-# [here](https://pytorch.org/docs/notes/autograd.html#excluding-subgraphs-from-backward)_.
-# 
-# 
-# 
+# %%
