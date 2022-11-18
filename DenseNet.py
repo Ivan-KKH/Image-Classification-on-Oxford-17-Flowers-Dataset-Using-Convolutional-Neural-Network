@@ -14,8 +14,11 @@ import matplotlib.pyplot as plt
 import time
 import os
 import copy
+from sklearn.metrics import confusion_matrix
 from model import densenet
 from torch.utils.tensorboard import SummaryWriter
+import seaborn as sn
+import pandas as pd
 # %%
 cudnn.benchmark = True
 plt.ion()   # interactive mode
@@ -68,10 +71,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
     best_acc = 0.0
     train_loss = []
     val_loss = []
-    test_loss = []
     train_acc = []
     val_acc = []
-    test_acc = []
     x_epoch = np.arange(num_epochs)
     for epoch in range(num_epochs):
         print(f'Epoch {epoch}/{num_epochs - 1}')
@@ -111,7 +112,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
 
-            if phase == 'train':
+            if phase == 'train' and scheduler != None:
                 scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
@@ -153,8 +154,9 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
         ax0.legend()
         ax1.legend()
         
-        fig.savefig(os.path.join('./lossGraphs', f'{writer_name}.jpg'))
+        
         print()
+    fig.savefig(os.path.join('./lossGraphs', f'{writer_name}.jpg'))
     writer.add_figure(tag = 'Graphs', figure= fig)
     writer.flush()
     time_elapsed = time.time() - since
@@ -169,7 +171,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25, writer_na
 
 # ### Visualizing the model predictions
 # Generic function to display predictions for a few images
-# %%
+
 def visualize_model(model, num_images=6):
     was_training = model.training
     model.eval()
@@ -196,112 +198,91 @@ def visualize_model(model, num_images=6):
                     return
         model.train(mode=was_training)
 
-def eval_model(model, criterion, optimizer, scheduler, num_epochs=1):
+def test_model(model, criterion):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
-    train_loss = []
-    val_loss = []
-    test_loss = []
-    train_acc = []
-    val_acc = []
-    test_acc = []
-    x_epoch = np.arange(num_epochs)
-    for epoch in range(num_epochs):
-        print(f'Epoch {epoch}/{num_epochs - 1}')
-        print('-' * 10)
+    
+    y_pred = []
+    y_true = []
 
-        # Each epoch has a training and validation phase
-        for phase in ['test']:
-            if phase == 'train':
-                model.train()  # Set model to training mode
-            else:
-                model.eval()   # Set model to evaluate mode
+        
+    model.eval()   # Set model to evaluate mode
 
-            running_loss = 0.0
-            running_corrects = 0
+    running_loss = 0.0
+    running_corrects = 0
 
-            # Iterate over data.
-            for inputs, labels in dataloaders[phase]:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                # track history if only in train
-                with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(inputs)
-                    _, preds = torch.max(outputs, 1)
-                    loss = criterion(outputs, labels)
-
-                    # backward + optimize only if in training phase
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
-
-                # statistics
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-
-            if phase == 'train':
-                scheduler.step()
-
-            epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_corrects.double() / dataset_sizes[phase]
-            if phase == 'train':
-                train_loss.append(epoch_loss)
-                train_acc.append(epoch_acc.cpu())
-                writer.add_scalar("Loss/train", epoch_loss, epoch)
-                writer.add_scalar("acc/train", epoch_acc, epoch)
-                writer.flush()
-                
-            elif phase == 'val':
-                val_loss.append(epoch_loss)
-                val_acc.append(epoch_acc.cpu())
-                writer.add_scalar("Loss/val", epoch_loss, epoch)
-                writer.add_scalar("acc/val", epoch_acc, epoch)
-                writer.flush()
+    # Iterate over data.
+    with torch.no_grad():
+        for inputs, labels in dataloaders['test']:
+            inputs = inputs.to(device)
+            y_true.extend(labels.data.cpu().numpy())
+            labels = labels.to(device)
             
-            elif phase == 'test':
-                test_loss.append(epoch_loss)
-                test_acc.append(epoch_acc.cpu())
-            
-            print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
-            # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+            # forward
+            # track history if only in train
+            
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            y_pred.extend(preds.data.cpu().numpy())
+            loss = criterion(outputs, labels)
+
+            # statistics
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels.data)
+
+        test_loss = running_loss / dataset_sizes['test']
+        test_acc = running_corrects.double() / dataset_sizes['test']
+        cf_matrix = confusion_matrix(y_true, y_pred, normalize= 'true')
+
+        df_cm = pd.DataFrame(cf_matrix, index = [i for i in class_names],
+                     columns = [i for i in class_names])
+        
+        
+        fig = plt.figure(figsize = (20,12))
+        sns = sn.heatmap(df_cm, annot=True)
+        fig = sns.get_figure()
+        fig.savefig(f'Confusion_Matrix/{writer_name}.png')
+        writer.add_figure(tag = 'Confusion Matrix', figure= fig)
+        writer.flush()
+        
+    print(f'test Loss: {test_loss:.4f} Acc: {test_acc:.4f}')
+
+    # deep copy the model
+            
 
     time_elapsed = time.time() - since
 
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return test_loss[0], test_acc[0]
-# %% [markdown]
-# Load a pretrained model and reset final fully connected layer.
+    return test_loss, test_acc
+
+
 # %%
 model_name = 'densenet121'
 optimizer_name = 'adam'
-number_of_epoch = 50 
-model = getattr(densenet, model_name)()
+number_of_epoch = 50
+batch_size = 4
+lr = 1e-4
+L2_lambda = 1e-5
+
 #model = vgg.vgg16(pretrained=False)
 
 # Data loading
 data_dir = 'flower'
 
-batch_size = 64
+
+model = getattr(densenet, model_name)()
 
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
-                                          data_transforms[x])
-                  for x in ['train', 'val','test']}
+                                        data_transforms[x])
+                for x in ['train', 'val','test']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
-                                             shuffle=True, num_workers=4)
-              for x in ['train', 'val', 'test']}
+                                            shuffle=True, num_workers=4)
+            for x in ['train', 'val','test']}
+
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
 class_names = image_datasets['train'].classes
 
@@ -318,16 +299,16 @@ model_ft = model.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
-lr = 1e-4
+
 gamma = 0.1
-#momentum = 0.9
+momentum = 0.9
 
 # Observe that all parameters are being optimized
 optimizer_ft = torch.optim.Adam(model.parameters(), lr= lr)
 #optimizer_ft = optim.SGD(model_ft.parameters(), lr=lr, momentum= momentum)
 
 # Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
+step_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=13, gamma=gamma)
 
 
 # ### Train and evaluate
@@ -335,16 +316,18 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=gamma)
 writer_name = f"{model_name}_{optimizer_name}_lr_{lr}_gamma_{gamma}_batch_size_{batch_size}"
 
 writer = SummaryWriter(comment = writer_name)
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
+model_ft = train_model(model_ft, criterion, optimizer_ft, step_lr_scheduler,
                     num_epochs=number_of_epoch, writer_name = writer_name)
 
 # %%
-test_loss, test_acc = eval_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler)
+
+
+test_loss, test_acc = test_model(model, criterion)
 
 writer.add_hparams({
         "batch_size": batch_size,
         "learning_rate": lr,
-        "model_name": model_name,
+        "model_name": f"{model_name}",
         "optimizer": optimizer_name,
         "num_of_epoch": number_of_epoch
         },
@@ -352,9 +335,13 @@ writer.add_hparams({
         "test_acc": test_acc,
         "test_loss" : test_loss}
         )
+        
 writer.flush()
 writer.close()
-# %%
-visualize_model(model_ft)
+
+
+
+
+
 
 # %%

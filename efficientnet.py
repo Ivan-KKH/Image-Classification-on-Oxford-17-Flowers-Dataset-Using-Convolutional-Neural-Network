@@ -262,7 +262,7 @@ def test_model(model, criterion):
 
 # %%
 model_name = 'EfficientNet'
-version = 'b1'
+version = 'b2'
 optimizer_name = 'adam'
 number_of_epoch = 50
 model = getattr(efficientnet, model_name)(version)
@@ -271,7 +271,7 @@ model = getattr(efficientnet, model_name)(version)
 # Data loading
 data_dir = 'flower'
 
-batch_size = 32
+batch_size = 64
 
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                           data_transforms[x])
@@ -332,6 +332,7 @@ writer.add_hparams({
         "test_acc": test_acc,
         "test_loss" : test_loss}
         )
+        
 writer.flush()
 writer.close()
 # %%
